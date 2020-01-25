@@ -1,12 +1,12 @@
-/*  (c) 2018-2019 HomeAccessoryKid */
+/*  (c) 2018-2020 HomeAccessoryKid */
 #ifndef __OTA_H__
 #define __OTA_H__
 
 #ifndef OTAVERSION
  #error You must set OTAVERSION=x.y.z of the ota code to match github version tag x.y.z
 #endif
-#define OTAREPO  "HomeACcessoryKid/life-cycle-manager"
-#define LCMREPO  "HomeACcessoryKid/life-cycle-manager"
+#define OTAREPO  "HomeACcessoryKid/LCMdev"
+#define LCMREPO  "HomeACcessoryKid/LCMdev"
 #define MAINFILE "otamain.bin"
 #define BOOTFILE "otaboot.bin"
 #define CERTFILE "certs.sector"
