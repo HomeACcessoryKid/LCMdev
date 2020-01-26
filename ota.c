@@ -438,14 +438,14 @@ void  ota_set_verify(int onoff) {
     }
 }
 
-void  ota_copy_bootloader(int size, char * version) {
+void  ota_copy_bootloader(int sector, int size, char * version) {
     UDPLGP("--- ota_copy_bootloader\n");
     byte buffer[SECTORSIZE];
     char versionbuff[MAXVERSIONLEN];
     
     memset(versionbuff,0xff,MAXVERSIONLEN);
     strcpy(versionbuff,version);
-    spiflash_read(backup_cert_sector, buffer, size);
+    spiflash_read(sector, buffer, size);
     spiflash_erase_sector(0);
     spiflash_write(0, buffer, size);
     spiflash_write(SECTORSIZE-MAXVERSIONLEN, (byte *)versionbuff, MAXVERSIONLEN);

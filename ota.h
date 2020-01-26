@@ -68,7 +68,7 @@ int   ota_load_user_app(char * *repo, char * *version, char * *file);
 
 void  ota_set_verify(int onoff);
 
-void  ota_copy_bootloader(int size, char * version);
+void  ota_copy_bootloader(int sector, int size, char * version);
 
 char* ota_get_btl_version();
 

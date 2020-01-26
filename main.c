@@ -123,19 +123,6 @@ void ota_task(void *arg) {
                 //report by syslog?  //trouble, so abort
                 break; //leads to boot=0
             }
-            if (new_version) free(new_version);
-            new_version=ota_get_version(BTLREPO);
-            if (strcmp(new_version,"404")) {
-                if (ota_compare(new_version,btl_version)>0) { //can only upgrade
-                    UDPLGP("BTLREPO=\'%s\' new_version=\'%s\' BTLFILE=\'%s\'\n",BTLREPO,new_version,BTLFILE);
-                    ota_get_hash(BTLREPO, new_version, BTLFILE, &signature);
-                    file_size=ota_get_file(BTLREPO,new_version,BTLFILE,backup_cert_sector);
-                    if (file_size>0 && !ota_verify_hash(backup_cert_sector,&signature)) {
-                        ota_finalize_file(backup_cert_sector);
-                        ota_copy_bootloader(file_size, new_version); //transfer it to sector zero
-                    } //else maybe next time more luck for the bootloader
-                } //no bootloader update 
-            }
             if (ota_boot()) { //running the ota-boot software now
                 //take care our boot code gets a signature by loading it in boot1sector just for this purpose
                 if (ota_get_hash(OTAREPO, ota_version, BOOTFILE, &signature)) { //no signature yet
@@ -175,6 +162,21 @@ void ota_task(void *arg) {
                 ota_temp_boot(); //launches the ota software in bootsector 1
             } else {  //running ota-main software now
                 UDPLGP("--- running ota-main software\n");
+                //is there a newer version of the bootloader...
+                if (new_version) free(new_version);
+                new_version=ota_get_version(BTLREPO);
+                if (strcmp(new_version,"404")) {
+                    if (ota_compare(new_version,btl_version)>0) { //can only upgrade
+                        UDPLGP("BTLREPO=\'%s\' new_version=\'%s\' BTLFILE=\'%s\'\n",BTLREPO,new_version,BTLFILE);
+                        if (!ota_get_hash(BTLREPO, new_version, BTLFILE, &signature)) {
+                            file_size=ota_get_file(BTLREPO,new_version,BTLFILE,backup_cert_sector);
+                            if (file_size>0 && !ota_verify_hash(backup_cert_sector,&signature)) {
+                                ota_finalize_file(backup_cert_sector);
+                                ota_copy_bootloader(backup_cert_sector, file_size, new_version); //transfer it to sector zero
+                            }
+                        } //else maybe next time more luck for the bootloader
+                    } //no bootloader update 
+                }
                 //if there is a newer version of ota-main...
                 if (ota_compare(ota_version,OTAVERSION)>0) { //set OTAVERSION when running make and match with github
                     ota_get_hash(OTAREPO, ota_version, BOOTFILE, &signature);
@@ -189,11 +191,12 @@ void ota_task(void *arg) {
                 new_version=ota_get_version(user_repo);
                 if (ota_compare(new_version,user_version)>0) { //can only upgrade
                     UDPLGP("user_repo=\'%s\' new_version=\'%s\' user_file=\'%s\'\n",user_repo,new_version,user_file);
-                    ota_get_hash(user_repo, new_version, user_file, &signature);
-                    file_size=ota_get_file(user_repo,new_version,user_file,BOOT0SECTOR);
-                    if (file_size<=0 || ota_verify_hash(BOOT0SECTOR,&signature)) continue; //something went wrong, but now boot0 is broken so start over
-                    ota_finalize_file(BOOT0SECTOR); //TODO return status and if wrong, continue
-                    ota_write_status(new_version); //we have been successful, hurray!
+                    if (!ota_get_hash(user_repo, new_version, user_file, &signature)) {
+                        file_size=ota_get_file(user_repo,new_version,user_file,BOOT0SECTOR);
+                        if (file_size<=0 || ota_verify_hash(BOOT0SECTOR,&signature)) continue; //something went wrong, but now boot0 is broken so start over
+                        ota_finalize_file(BOOT0SECTOR); //TODO return status and if wrong, continue
+                        ota_write_status(new_version); //we have been successful, hurray!
+                    }
                 } //nothing to update
                 break; //leads to boot=0 and starts updated user app
             }
