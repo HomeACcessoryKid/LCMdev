@@ -25,6 +25,7 @@ void ota_task(void *arg) {
     char*  new_version=NULL;
     char*  ota_version=NULL;
     char*  lcm_version=NULL;
+    char*  btl_version=NULL;
     signature_t signature;
     extern int active_cert_sector;
     extern int backup_cert_sector;
@@ -57,12 +58,13 @@ void ota_task(void *arg) {
         }
     }
 
+    btl_version=ota_get_btl_version();
     if (ota_boot()) ota_write_status("0.0.0");  //we will have to get user code from scratch if running ota_boot
-    if ( !ota_load_user_app(&user_repo, &user_version, &user_file)) { //repo/version/file must be configured
+    if ( !ota_load_user_app(&user_repo, &user_version, &user_file)) { //repo/file must be configured
         if (ota_boot()) {
             new_version=ota_get_version(user_repo); //check if this repository exists at all
             if (!strcmp(new_version,"404")) {
-                UDPLGP("%s so it does not exist! HALTED FOR EVER!\n",user_repo);
+                UDPLGP("%s does not exist! HALTED TILL NEXT POWERCYCLE!\n",user_repo);
                 vTaskDelete(NULL);
             }
         }
@@ -120,6 +122,19 @@ void ota_task(void *arg) {
             if (ota_get_hash(OTAREPO, ota_version, CERTFILE, &signature)) { //testdownload, if server is fake will trigger
                 //report by syslog?  //trouble, so abort
                 break; //leads to boot=0
+            }
+            if (new_version) free(new_version);
+            new_version=ota_get_version(BTLREPO);
+            if (strcmp(new_version,"404")) {
+                if (ota_compare(new_version,btl_version)>0) { //can only upgrade
+                    UDPLGP("BTLREPO=\'%s\' new_version=\'%s\' BTLFILE=\'%s\'\n",BTLREPO,new_version,BTLFILE);
+                    ota_get_hash(BTLREPO, new_version, BTLFILE, &signature);
+                    file_size=ota_get_file(BTLREPO,new_version,BTLFILE,backup_cert_sector);
+                    if (file_size>0 && !ota_verify_hash(backup_cert_sector,&signature)) {
+                        ota_finalize_file(backup_cert_sector);
+                        ota_copy_bootloader(file_size, new_version); //transfer it to sector zero
+                    } //else maybe next time more luck for the bootloader
+                } //no bootloader update 
             }
             if (ota_boot()) { //running the ota-boot software now
                 //take care our boot code gets a signature by loading it in boot1sector just for this purpose

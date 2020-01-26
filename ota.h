@@ -7,6 +7,8 @@
 #endif
 #define OTAREPO  "HomeACcessoryKid/LCMdev"
 #define LCMREPO  "HomeACcessoryKid/LCMdev"
+#define BTLREPO  "HomeACcessoryKid/rboot4lcm"
+#define BTLFILE "rboot.bin"
 #define MAINFILE "otamain.bin"
 #define BOOTFILE "otaboot.bin"
 #define CERTFILE "certs.sector"
@@ -65,6 +67,10 @@ int   ota_compare(char* newv, char* oldv);
 int   ota_load_user_app(char * *repo, char * *version, char * *file);
 
 void  ota_set_verify(int onoff);
+
+void  ota_copy_bootloader(int size, char * version);
+
+char* ota_get_btl_version();
 
 char* ota_get_version(char * repo);
 

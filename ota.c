@@ -381,7 +381,10 @@ int   ota_load_user_app(char * *repo, char * *version, char * *file) {
     status = sysparam_get_string("ota_version", &value);
     if (status == SYSPARAM_OK) {
         *version=value;
-    } else return -1;
+    } else {
+        *version=malloc(6); //TODO check if this is valid coding
+        strcpy(*version,"0.0.0");
+    }
     status = sysparam_get_string("ota_file", &value);
     if (status == SYSPARAM_OK) {
         *file=value;
@@ -435,6 +438,36 @@ void  ota_set_verify(int onoff) {
     }
 }
 
+void  ota_copy_bootloader(int size, char * version) {
+    UDPLGP("--- ota_copy_bootloader\n");
+    byte buffer[SECTORSIZE];
+    char versionbuff[MAXVERSIONLEN];
+    
+    memset(versionbuff,0xff,MAXVERSIONLEN);
+    strcpy(versionbuff,version);
+    spiflash_read(backup_cert_sector, buffer, size);
+    spiflash_erase_sector(0);
+    spiflash_write(0, buffer, size);
+    spiflash_write(SECTORSIZE-MAXVERSIONLEN, (byte *)versionbuff, MAXVERSIONLEN);
+}   //version is stored in last MAXVERSIONLEN bytes of sector zero which is beyond the code
+
+char* ota_get_btl_version() {
+    UDPLGP("--- ota_get_btl_version\n");
+    char versionbuff[MAXVERSIONLEN];
+    char* version=NULL;
+    
+    spiflash_read(SECTORSIZE-MAXVERSIONLEN, (byte *)versionbuff, MAXVERSIONLEN);
+    if (versionbuff[0]!=0xff) { //TODO: make this more error resistant
+        version=malloc(strlen(versionbuff));
+        strcpy(version,versionbuff);
+    } else {
+        version=malloc(6);
+        strcpy(version,"0.0.0");
+    }
+    UDPLGP("bootloader version:\"%s\"\n",version);
+    return version;
+}
+
 int   ota_get_file_ex(char * repo, char * version, char * file, int sector, byte * buffer, int bufsz); //prototype needed
 char* ota_get_version(char * repo) {
     UDPLGP("--- ota_get_version\n");
@@ -486,6 +519,7 @@ char* ota_get_version(char * repo) {
                 strchr(location,'\r')[0]=0;
                 //printf("%s\n",location);
                 location=strstr(location,"tag/");
+                if (location[4]=='v') location++;
                 version=malloc(strlen(location+4));
                 strcpy(version,location+4);
                 printf("%s@version:\"%s\" according to latest release\n",repo,version);
@@ -514,8 +548,10 @@ char* ota_get_version(char * repo) {
 //     if (retc) return retc;
 //     if (ret <= 0) return ret;
 
+    //TODO: maybe add more error return messages... like version "99999.99.99"
     //find latest-pre-release if joined beta program
-    if ( (userbeta && strcmp(OTAREPO,repo)) || (otabeta && !strcmp(OTAREPO,repo)) ) {
+    bool OTAorBTL=!(strcmp(OTAREPO,repo)&&strcmp(BTLREPO,repo));
+    if ( (userbeta && !OTAorBTL) || (otabeta && OTAorBTL)) {
         prerelease[63]=0;
         ret=ota_get_file_ex(repo,version,"latest-pre-release",0,(byte *)prerelease,63);
         if (ret>0) {
