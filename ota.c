@@ -448,8 +448,12 @@ void  ota_copy_bootloader(int sector, int size, char * version) {
     spiflash_read(sector, buffer, size);
     spiflash_erase_sector(0);
     spiflash_write(0, buffer, size);
+    //version is stored as a string in last MAXVERSIONLEN bytes of sector
     spiflash_write(SECTORSIZE-MAXVERSIONLEN, (byte *)versionbuff, MAXVERSIONLEN);
-}   //version is stored in last MAXVERSIONLEN bytes of sector zero which is beyond the code
+    //set last uint32 to zero of the config sector so rboot will reflash it
+    memset(versionbuff,0,4);
+    spiflash_write(2*SECTORSIZE-4, (byte *)versionbuff, 4);
+}
 
 char* ota_get_btl_version() {
     UDPLGP("--- ota_get_btl_version\n");
