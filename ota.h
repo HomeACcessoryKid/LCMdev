@@ -50,6 +50,8 @@ typedef struct {
 int active_cert_sector;
 int backup_cert_sector;
 
+void  ota_read_rtc();
+
 void  ota_new_layout();
 
 void  ota_init();

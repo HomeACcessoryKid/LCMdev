@@ -30,7 +30,9 @@ void ota_task(void *arg) {
     extern int active_cert_sector;
     extern int backup_cert_sector;
     int file_size; //32bit
+#ifdef OTABOOT    
     int have_private_key=0;
+#endif
     int keyid,foundkey=0;
     char keyname[KEYNAMELEN];
     
@@ -49,6 +51,7 @@ void ota_task(void *arg) {
     UDPLGP("active_cert_sector: 0x%05x\n",active_cert_sector);
     file_size=ota_get_pubkey(active_cert_sector);
     
+#ifdef OTABOOT    
     if (!ota_get_privkey()) { //have private key
         have_private_key=1;
         UDPLGP("have private key\n");
@@ -57,10 +60,12 @@ void ota_task(void *arg) {
             vTaskDelete(NULL); //upload the signature out of band to github and flash the new private key to backupsector
         }
     }
+#endif
 
     btl_version=ota_get_btl_version();
     if (ota_boot()) ota_write_status("0.0.0");  //we will have to get user code from scratch if running ota_boot
     if ( !ota_load_user_app(&user_repo, &user_version, &user_file)) { //repo/file must be configured
+#ifdef OTABOOT    
         if (ota_boot()) {
             new_version=ota_get_version(user_repo); //check if this repository exists at all
             if (!strcmp(new_version,"404")) {
@@ -68,6 +73,7 @@ void ota_task(void *arg) {
                 vTaskDelete(NULL);
             }
         }
+#endif
         
         for (;;) { //escape from this loop by continue (try again) or break (boots into slot 0)
             UDPLGP("--- entering the loop\n");
@@ -85,12 +91,13 @@ void ota_task(void *arg) {
             if (ota_version) free(ota_version);
             ota_version=ota_get_version(OTAREPO);
             if (ota_get_hash(OTAREPO, ota_version, CERTFILE, &signature)) { //no certs.sector.sig exists yet on server
+#ifdef OTABOOT    
                 if (have_private_key) {
                     ota_sign(active_cert_sector,SECTORSIZE, &signature, CERTFILE); //reports to console
                     vTaskDelete(NULL); //upload the signature out of band to github and start again
-                } else {
+                } else
+#endif
                     continue; //loop and try again later
-                }
             }
             if (ota_verify_hash(active_cert_sector,&signature)) { //seems we need to download certificates
                 if (ota_verify_signature(&signature)) { //maybe an update on the public key
@@ -124,6 +131,7 @@ void ota_task(void *arg) {
                 break; //leads to boot=0
             }
             if (ota_boot()) { //running the ota-boot software now
+#ifdef OTABOOT    
                 //take care our boot code gets a signature by loading it in boot1sector just for this purpose
                 if (ota_get_hash(OTAREPO, ota_version, BOOTFILE, &signature)) { //no signature yet
                     if (have_private_key) {
@@ -160,6 +168,7 @@ void ota_task(void *arg) {
                 //ota_get_pubkey(backup_cert_sector);
                 if (ota_verify_signature(&signature)) continue; //this should never happen
                 ota_temp_boot(); //launches the ota software in bootsector 1
+#endif
             } else {  //running ota-main software now
                 UDPLGP("--- running ota-main software\n");
                 //is there a newer version of the bootloader...
@@ -217,6 +226,7 @@ void user_init(void) {
 //    uart_set_baud(0, 74880);
     uart_set_baud(0, 115200);
 
+    ota_read_rtc(); //read RTC outcome from rboot4lcm and act accordingly
     ota_new_layout();
         
     wifi_config_init("LCM", NULL, on_wifi_ready); //expanded it with setting repo-details

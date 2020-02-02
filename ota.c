@@ -39,7 +39,39 @@ bool userbeta=0;
 bool otabeta=0;
 
 
+void  ota_read_rtc() {
+    UDPLGP("--- ota_read_rtc\n");
+	int sector,count=0;
+	rboot_rtc_data rtc;
+
+	if (rboot_get_rtc_data(&rtc)) count=rtc.temp_rom;
+    
+    UDPLGP("--- count=%d\n",count);
+    switch (count) {
+        case 8: case 9: case 10: { //reset wifi parameters
+            UDPLGP("--- reset wifi\n");
+            sysparam_set_string("wifi_ssid",NULL);
+            sysparam_set_string("wifi_password",NULL);
+            break;}
+        case 14: case 15: case 16: { //factory reset and otabeta
+            UDPLGP("--- set otabeta\n");
+            otabeta=1;
+            } //fall through on purpose
+        case 11: case 12: case 13: { //factory reset
+            UDPLGP("--- factory reset\n");
+            spiflash_erase_sector(SYSPARAMSECTOR); spiflash_erase_sector(SYSPARAMSECTOR+SECTORSIZE); //sysparam reset
+            for (sector=0xfb000; sector<   0x100000; sector+=SECTORSIZE) spiflash_erase_sector(sector);//Espressif area
+            #ifndef OTABOOT    
+             for(sector= 0x2000; sector<BOOT1SECTOR; sector+=SECTORSIZE) spiflash_erase_sector(sector);//user space
+            #endif
+            break;}
+        default: { //standard ota-main or ota-boot behavior
+        break;}
+    }
+}
+
 void  ota_new_layout() {
+    UDPLGP("--- ota_new_layout\n");
     sysparam_status_t status;
 
     status = sysparam_init(SYSPARAMSECTOR, 0);
@@ -62,8 +94,9 @@ void  ota_init() {
     
     //using beta = pre-releases?
     #ifdef OTABETA
-    sysparam_set_bool("lcm_beta", 1);
+    otabeta=1;
     #endif
+    if (otabeta) sysparam_set_bool("lcm_beta", 1);
     sysparam_get_bool("lcm_beta", &otabeta);
     sysparam_get_bool("ota_beta", &userbeta);
     
@@ -131,6 +164,7 @@ void  ota_init() {
     UDPLGP("done!\n");
 }
 
+#ifdef OTABOOT    
 int ota_get_privkey() {
     UDPLGP("--- ota_get_privkey\n");
     
@@ -161,6 +195,7 @@ int ota_get_privkey() {
     */
     return ret;
 }
+#endif
 
 int ota_get_pubkey(int sector) { //get the ecdsa key from the indicated sector, report filesize
     UDPLGP("--- ota_get_pubkey\n");
@@ -186,6 +221,7 @@ int ota_get_pubkey(int sector) { //get the ecdsa key from the indicated sector, 
     if (!ret)return PKEYSIZE; else return ret;
 }
 
+#ifdef OTABOOT    
 int ota_verify_pubkey(void) { //check if public and private key are a pair
     UDPLGP("--- ota_verify_pubkey\n");
     
@@ -205,6 +241,7 @@ int ota_verify_pubkey(void) { //check if public and private key are a pair
         
     return answer-1;
 }
+#endif
 
 void ota_hash(int start_sector, int filesize, byte * hash, byte first_byte) {
     UDPLGP("--- ota_hash\n");
@@ -233,6 +270,7 @@ void ota_hash(int start_sector, int filesize, byte * hash, byte first_byte) {
     wc_Sha384Final(&sha, hash);
 }
 
+#ifdef OTABOOT    
 void ota_sign(int start_sector, int filesize, signature_t* signature, char* file) {
     UDPLGP("--- ota_sign\n");
     
@@ -246,6 +284,7 @@ void ota_sign(int start_sector, int filesize, signature_t* signature, char* file
     printf("echo "); for (i=0;i<siglen  ;i++) printf("%02x ",signature->sign[i]); printf(">>x.hex\n");
     printf("xxd -r -p x.hex > %s.sig\n",file);  printf("rm x.hex\n");
 }
+#endif
 
 int ota_compare(char* newv, char* oldv) { //(if equal,0) (if newer,1) (if pre-release or older,-1)
     UDPLGP("--- ota_compare ");
@@ -523,7 +562,7 @@ char* ota_get_version(char * repo) {
                 strchr(location,'\r')[0]=0;
                 //printf("%s\n",location);
                 location=strstr(location,"tag/");
-                if (location[4]=='v') location++;
+                if (location[4]=='v' || location[4]=='V') location++;
                 version=malloc(strlen(location+4));
                 strcpy(version,location+4);
                 printf("%s@version:\"%s\" according to latest release\n",repo,version);
