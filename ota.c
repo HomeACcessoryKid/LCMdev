@@ -50,8 +50,8 @@ void  ota_read_rtc() {
     switch (count) {
         case 8: case 9: case 10: { //reset wifi parameters
             UDPLGP("--- reset wifi\n");
-            sysparam_set_string("wifi_ssid",NULL);
-            sysparam_set_string("wifi_password",NULL);
+            sysparam_set_string("wifi_ssid","");
+            sysparam_set_string("wifi_password","");
             break;}
         case 14: case 15: case 16: { //factory reset and otabeta
             UDPLGP("--- set otabeta\n");
@@ -59,7 +59,7 @@ void  ota_read_rtc() {
             } //fall through on purpose
         case 11: case 12: case 13: { //factory reset
             UDPLGP("--- factory reset\n");
-            spiflash_erase_sector(SYSPARAMSECTOR); spiflash_erase_sector(SYSPARAMSECTOR+SECTORSIZE); //sysparam reset
+            spiflash_erase_sector(SYSPARAMSECTOR);    spiflash_erase_sector(SYSPARAMSECTOR+SECTORSIZE);//sysparam reset
             for (sector=0xfb000; sector<   0x100000; sector+=SECTORSIZE) spiflash_erase_sector(sector);//Espressif area
             #ifndef OTABOOT    
              for(sector= 0x2000; sector<BOOT1SECTOR; sector+=SECTORSIZE) spiflash_erase_sector(sector);//user space
@@ -73,12 +73,22 @@ void  ota_read_rtc() {
 void  ota_new_layout() {
     UDPLGP("--- ota_new_layout\n");
     sysparam_status_t status;
+    uint32_t base_addr;
+    uint32_t num_sectors;  
 
     status = sysparam_init(SYSPARAMSECTOR, 0);
-    if (status == SYSPARAM_NOTFOUND) {
-        status = sysparam_create_area(SYSPARAMSECTOR, 2, false);
+    if (status != SYSPARAM_OK) {
+        status = sysparam_create_area(SYSPARAMSECTOR, 2, true);
         if (status == SYSPARAM_OK) {
             status = sysparam_init(SYSPARAMSECTOR, 0);
+        }
+    } else {
+        sysparam_get_info(&base_addr, &num_sectors);
+        if (num_sectors!=2) {
+            status = sysparam_create_area(SYSPARAMSECTOR, 2, true);
+            if (status == SYSPARAM_OK) {
+                status = sysparam_init(SYSPARAMSECTOR, 0);
+            }
         }
     }
     if (status != SYSPARAM_OK) {

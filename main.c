@@ -25,7 +25,9 @@ void ota_task(void *arg) {
     char*  new_version=NULL;
     char*  ota_version=NULL;
     char*  lcm_version=NULL;
+#ifndef OTABOOT    
     char*  btl_version=NULL;
+#endif
     signature_t signature;
     extern int active_cert_sector;
     extern int backup_cert_sector;
@@ -60,9 +62,9 @@ void ota_task(void *arg) {
             vTaskDelete(NULL); //upload the signature out of band to github and flash the new private key to backupsector
         }
     }
-#endif
-
+#else
     btl_version=ota_get_btl_version();
+#endif
     if (ota_boot()) ota_write_status("0.0.0");  //we will have to get user code from scratch if running ota_boot
     if ( !ota_load_user_app(&user_repo, &user_version, &user_file)) { //repo/file must be configured
 #ifdef OTABOOT    
@@ -170,6 +172,7 @@ void ota_task(void *arg) {
                 ota_temp_boot(); //launches the ota software in bootsector 1
 #endif
             } else {  //running ota-main software now
+#ifndef OTABOOT    
                 UDPLGP("--- running ota-main software\n");
                 //is there a newer version of the bootloader...
                 if (new_version) free(new_version);
@@ -208,6 +211,7 @@ void ota_task(void *arg) {
                     }
                 } //nothing to update
                 break; //leads to boot=0 and starts updated user app
+#endif
             }
         }
     }
