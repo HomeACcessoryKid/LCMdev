@@ -42,6 +42,7 @@ bool otabeta=0;
 void  ota_read_rtc() {
     UDPLGP("--- ota_read_rtc\n");
 	int sector,count=0;
+    bool reset_wifi=0;
 	rboot_rtc_data rtc;
 
 	if (rboot_get_rtc_data(&rtc)) count=rtc.temp_rom;
@@ -50,8 +51,7 @@ void  ota_read_rtc() {
     switch (count) {
         case 8: case 9: case 10: { //reset wifi parameters
             UDPLGP("--- reset wifi\n");
-            sysparam_set_string("wifi_ssid","");
-            sysparam_set_string("wifi_password","");
+            reset_wifi=1;
             break;}
         case 14: case 15: case 16: { //factory reset and otabeta
             UDPLGP("--- set otabeta\n");
@@ -68,10 +68,6 @@ void  ota_read_rtc() {
         default: { //standard ota-main or ota-boot behavior
         break;}
     }
-}
-
-void  ota_new_layout() {
-    UDPLGP("--- ota_new_layout\n");
     sysparam_status_t status;
     uint32_t base_addr;
     uint32_t num_sectors;  
@@ -94,6 +90,18 @@ void  ota_new_layout() {
     if (status != SYSPARAM_OK) {
         printf("WARNING: Could not initialize sysparams (%d)!\n", status);
     }
+    if (reset_wifi) {
+        sysparam_set_string("wifi_ssid","");
+        sysparam_set_string("wifi_password","");
+    }
+    #ifdef OTABETA
+    otabeta=1; //using beta = pre-releases?
+    #endif
+    if (otabeta) sysparam_set_bool("lcm_beta", 1);
+    sysparam_get_bool("lcm_beta", &otabeta);
+    sysparam_get_bool("ota_beta", &userbeta);
+    
+    UDPLGP("userbeta=\'%d\' otabeta=\'%d\'\n",userbeta,otabeta);
 }
 
 void  ota_init() {
@@ -101,16 +109,6 @@ void  ota_init() {
 
     ip_addr_t target_ip;
     int ret;
-    
-    //using beta = pre-releases?
-    #ifdef OTABETA
-    otabeta=1;
-    #endif
-    if (otabeta) sysparam_set_bool("lcm_beta", 1);
-    sysparam_get_bool("lcm_beta", &otabeta);
-    sysparam_get_bool("ota_beta", &userbeta);
-    
-    UDPLGP("userbeta=\'%d\' otabeta=\'%d\'\n",userbeta,otabeta);
     
     //rboot setup
     rboot_config conf;

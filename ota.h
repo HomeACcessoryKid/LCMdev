@@ -52,8 +52,6 @@ int backup_cert_sector;
 
 void  ota_read_rtc();
 
-void  ota_new_layout();
-
 void  ota_init();
 
 int   ota_get_privkey();
