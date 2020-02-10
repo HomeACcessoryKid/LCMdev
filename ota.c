@@ -42,32 +42,35 @@ bool otabeta=0;
 void  ota_read_rtc() {
     UDPLGP("--- ota_read_rtc\n");
 	int sector,count=0;
+	int8_t count_step=3;
     bool reset_wifi=0;
 	rboot_rtc_data rtc;
 
+    sysparam_get_int8("ota_count_step", &count_step); //defaults to value=3 if not present
+    if (count_step>3 || count_step<1) count_step=3;
+    
 	if (rboot_get_rtc_data(&rtc)) count=rtc.temp_rom;
     
     UDPLGP("--- count=%d\n",count);
-    switch (count) {
-        case 8: case 9: case 10: { //reset wifi parameters
+    if      (count<5+count_step*1) { //standard ota-main or ota-boot behavior
+    }
+    else if (count<5+count_step*2) { //reset wifi parameters
             UDPLGP("--- reset wifi\n");
             reset_wifi=1;
-            break;}
-        case 14: case 15: case 16: { //factory reset and otabeta
-            UDPLGP("--- set otabeta\n");
-            otabeta=1;
-            } //fall through on purpose
-        case 11: case 12: case 13: { //factory reset
+    }
+    else    {//factory reset
             UDPLGP("--- factory reset\n");
             spiflash_erase_sector(SYSPARAMSECTOR);    spiflash_erase_sector(SYSPARAMSECTOR+SECTORSIZE);//sysparam reset
             for (sector=0xfb000; sector<   0x100000; sector+=SECTORSIZE) spiflash_erase_sector(sector);//Espressif area
             #ifndef OTABOOT    
              for(sector= 0x2000; sector<BOOT1SECTOR; sector+=SECTORSIZE) spiflash_erase_sector(sector);//user space
             #endif
-            break;}
-        default: { //standard ota-main or ota-boot behavior
-        break;}
     }
+    if      (count>=5+count_step*3) { //factory reset and otabeta
+            UDPLGP("--- set otabeta\n");
+            otabeta=1;
+    }
+
     sysparam_status_t status;
     uint32_t base_addr;
     uint32_t num_sectors;  
@@ -88,7 +91,7 @@ void  ota_read_rtc() {
         }
     }
     if (status != SYSPARAM_OK) {
-        printf("WARNING: Could not initialize sysparams (%d)!\n", status);
+        printf("WARNING: LCM/OTA could not initialize sysparams (%d)!\n", status);
     }
     if (reset_wifi) {
         sysparam_set_string("wifi_ssid","");
