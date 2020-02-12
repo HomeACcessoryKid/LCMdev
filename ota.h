@@ -6,7 +6,7 @@
  #error You must set OTAVERSION=x.y.z of the ota code to match github version tag x.y.z
 #endif
 #define OTAREPO  "HomeACcessoryKid/LCMdev"
-#define LCMREPO  "HomeACcessoryKid/LCMdev"
+//#define LCMREPO  "HomeACcessoryKid/LCMdev"
 #define BTLREPO  "HomeACcessoryKid/rboot4lcm"
 #define BTLFILE "rboot.bin"
 #define MAINFILE "otamain.bin"

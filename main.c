@@ -24,7 +24,7 @@ void ota_task(void *arg) {
     char* user_file=NULL;
     char*  new_version=NULL;
     char*  ota_version=NULL;
-    char*  lcm_version=NULL;
+//    char*  lcm_version=NULL;
 #ifndef OTABOOT    
     char*  btl_version=NULL;
 #endif
@@ -89,7 +89,7 @@ void ota_task(void *arg) {
             ota_get_pubkey(active_cert_sector); //in case the LCM update is in a cycle
             
             ota_set_verify(0); //should work even without certificates
-            if (lcm_version) free(lcm_version);
+            //if (lcm_version) free(lcm_version);
             if (ota_version) free(ota_version);
             ota_version=ota_get_version(OTAREPO);
             if (ota_get_hash(OTAREPO, ota_version, CERTFILE, &signature)) { //no certs.sector.sig exists yet on server
@@ -145,11 +145,11 @@ void ota_task(void *arg) {
                     }
                 }
                 //switching over to a new repository, called LCM life-cycle-manager
-                lcm_version=ota_get_version(LCMREPO);
+                //lcm_version=ota_get_version(LCMREPO);
                 //now get the latest ota main software in boot sector 1
-                if (ota_get_hash(LCMREPO, lcm_version, MAINFILE, &signature)) { //no signature yet
+                if (ota_get_hash(OTAREPO, ota_version, MAINFILE, &signature)) { //no signature yet
                     if (have_private_key) {
-                        file_size=ota_get_file(LCMREPO,lcm_version,MAINFILE,BOOT1SECTOR);
+                        file_size=ota_get_file(OTAREPO,ota_version,MAINFILE,BOOT1SECTOR);
                         if (file_size<=0) continue; //try again later
                         ota_finalize_file(BOOT1SECTOR);
                         ota_sign(BOOT1SECTOR,file_size, &signature, MAINFILE); //reports to console
@@ -159,7 +159,7 @@ void ota_task(void *arg) {
                     }
                 } else { //we have a signature, maybe also the main file?
                     if (ota_verify_hash(BOOT1SECTOR,&signature)) { //not yet downloaded
-                        file_size=ota_get_file(LCMREPO,lcm_version,MAINFILE,BOOT1SECTOR);
+                        file_size=ota_get_file(OTAREPO,ota_version,MAINFILE,BOOT1SECTOR);
                         if (file_size<=0) continue; //try again later
                         if (ota_verify_hash(BOOT1SECTOR,&signature)) continue; //download failed
                         ota_finalize_file(BOOT1SECTOR);

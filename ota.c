@@ -42,17 +42,27 @@ bool otabeta=0;
 void  ota_read_rtc() {
     UDPLGP("--- ota_read_rtc\n");
 	int sector,count=0;
-	int8_t count_step=3;
+	int count_step=3;
+    sysparam_status_t status;
+    char *value;
     bool reset_wifi=0;
 	rboot_rtc_data rtc;
 
-    sysparam_get_int8("ota_count_step", &count_step); //defaults to value=3 if not present
-    if (count_step>3 || count_step<1) count_step=3;
+    status = sysparam_init(SYSPARAMSECTOR, 0);
+    if (status == SYSPARAM_OK) {
+        status = sysparam_get_string("ota_count_step", &value);
+        if (status == SYSPARAM_OK) {
+            if (*value<0x34 && *value>0x30 && strlen(value)==1) count_step=*value-0x30;
+            free(value);
+        }
+    }
+    UDPLGP("--- count_step=%d\n",count_step);
     
 	if (rboot_get_rtc_data(&rtc)) count=rtc.temp_rom;
     
     UDPLGP("--- count=%d\n",count);
     if      (count<5+count_step*1) { //standard ota-main or ota-boot behavior
+            UDPLGP("--- standard ota\n");
     }
     else if (count<5+count_step*2) { //reset wifi parameters
             UDPLGP("--- reset wifi\n");
@@ -71,7 +81,6 @@ void  ota_read_rtc() {
             otabeta=1;
     }
 
-    sysparam_status_t status;
     uint32_t base_addr;
     uint32_t num_sectors;  
 
@@ -96,6 +105,7 @@ void  ota_read_rtc() {
     if (reset_wifi) {
         sysparam_set_string("wifi_ssid","");
         sysparam_set_string("wifi_password","");
+        //TODO: remove esp wifi settings and set AP mode
     }
     #ifdef OTABETA
     otabeta=1; //using beta = pre-releases?
