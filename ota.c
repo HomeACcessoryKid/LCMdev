@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <espressif/esp_common.h>
 #include <lwip/sockets.h>
 #include <lwip/api.h>
 #include <esp8266.h>
@@ -105,20 +106,24 @@ void  ota_read_rtc() {
     if (reset_wifi) {
         sysparam_set_string("wifi_ssid","");
         sysparam_set_string("wifi_password","");
-        //TODO: remove esp wifi settings and set AP mode
+        sysparam_compact(); //to make a copy without the ssid/password (does not erase old region)
+        sysparam_compact(); //to make sure the information really gets wiped
+        struct sdk_station_config sta_config; //remove esp wifi client settings
+        memset(&sta_config, 0, sizeof(sta_config));
+        sdk_wifi_station_set_config(&sta_config); //This wipes out the info in sectors 0xfd000+
     }
     #ifdef OTABETA
     otabeta=1; //using beta = pre-releases?
     #endif
     if (otabeta) sysparam_set_bool("lcm_beta", 1);
-    sysparam_get_bool("lcm_beta", &otabeta);
-    sysparam_get_bool("ota_beta", &userbeta);
-    
-    UDPLGP("userbeta=\'%d\' otabeta=\'%d\'\n",userbeta,otabeta);
 }
 
 void  ota_init() {
     UDPLGP("--- ota_init\n");
+
+    sysparam_get_bool("lcm_beta", &otabeta);
+    sysparam_get_bool("ota_beta", &userbeta);
+    UDPLGP("userbeta=\'%d\' otabeta=\'%d\'\n",userbeta,otabeta);
 
     ip_addr_t target_ip;
     int ret;
